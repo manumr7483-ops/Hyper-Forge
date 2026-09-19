@@ -15,11 +15,9 @@ function App() {
   const basename =
     process.env.REACT_APP_BASENAME !== undefined
       ? process.env.REACT_APP_BASENAME
-      : typeof window !== "undefined" && window.location.pathname.startsWith("/Hyper-Forge")
-      ? "/Hyper-Forge"
-      : typeof window !== "undefined" && window.location.pathname.startsWith("/HypeFoge")
-      ? "/HypeFoge"
-      : "";
+      : typeof window !== "undefined" && window.location.pathname.toLowerCase().startsWith("/hyper-forge")
+      ? window.location.pathname.slice(0, 12)
+      : process.env.PUBLIC_URL || "";
 
   return (
     <AuthProvider>
