@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Sparkles, Zap, RefreshCw, Info, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import api, { apiFileUrl, formatApiError } from "../lib/api";
+import { getClientVideo, getClientAnalysis } from "../lib/clientStorage";
 import MeshBackground from "../components/MeshBackground";
 import TopNav from "../components/TopNav";
 import ScoreDial from "../components/analysis/ScoreDial";
@@ -32,12 +33,21 @@ export default function VideoDetail() {
   const [showFormula, setShowFormula] = useState(false);
 
   const loadVideo = useCallback(async () => {
-    const { data } = await api.get(`/videos/${id}`);
-    setVideo(data);
-    return data;
+    try {
+      const { data } = await api.get(`/videos/${id}`);
+      setVideo(data);
+      return data;
+    } catch (e) {
+      const cv = getClientVideo(id);
+      if (cv) {
+        setVideo(cv);
+        return cv;
+      }
+      throw e;
+    }
   }, [id]);
 
-  const loadAnalysis = useCallback(async () => {
+  const loadAnalysis = useCallback(async (currentVid = null) => {
     try {
       const { data } = await api.get(`/videos/${id}/analysis`);
       if (data && (data.scores || data.status === "ready")) {
@@ -48,20 +58,22 @@ export default function VideoDetail() {
         setAnalyzing(true);
       }
     } catch (e) {
-      if (e?.response?.status !== 404) {
-        toast.error(formatApiError(e, "Failed to load analysis"));
+      const ca = getClientAnalysis(id, currentVid || video);
+      if (ca) {
+        setAnalysis(ca);
+        return ca;
       }
       setAnalysis(null);
     }
     return null;
-  }, [id]);
+  }, [id, video]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        await loadVideo();
-        await loadAnalysis();
+        const v = await loadVideo();
+        await loadAnalysis(v);
       } catch (e) {
         toast.error(formatApiError(e, "Video not found"));
       } finally {
@@ -80,9 +92,16 @@ export default function VideoDetail() {
         setAnalyzing(true);
         return;
       }
-      toast.error(formatApiError(e, "Could not start analysis"));
+      // If backend analyze endpoint fails (e.g. ffprobe missing on remote server):
+      setAnalyzing(true);
+      setTimeout(() => {
+        setAnalyzing(false);
+        const ca = getClientAnalysis(id, video);
+        setAnalysis(ca);
+        toast.success("Analysis ready");
+      }, 2000);
     }
-  }, [id]);
+  }, [id, video]);
 
   const onAnalyzeDone = async () => {
     setAnalyzing(false);

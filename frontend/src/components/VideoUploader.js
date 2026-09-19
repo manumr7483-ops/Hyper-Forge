@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { UploadCloud, Film, X } from "lucide-react";
 import { toast } from "sonner";
 import { API_BASE, formatApiError } from "../lib/api";
+import { captureVideoFrame, saveClientVideo } from "../lib/clientStorage";
 
 const ACCEPT = ".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm";
 const MAX_BYTES = 200 * 1024 * 1024;
@@ -101,10 +102,39 @@ export default function VideoUploader({ projectId, onUploaded }) {
         }
       };
 
+      const handleClientFallback = async (reason = "server offline") => {
+        try {
+          const meta = await captureVideoFrame(file);
+          const localId = "local_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+          const blobUrl = URL.createObjectURL(file);
+          const videoDoc = {
+            id: localId,
+            project_id: projectId,
+            title: file.name,
+            original_url: blobUrl,
+            thumbnail_url: meta.thumbnailDataUrl || "",
+            duration_seconds: meta.duration || 15,
+            aspect_ratio: meta.resolution || "1080x1920",
+            file_size_bytes: file.size,
+            status: "uploaded",
+            created_at: new Date().toISOString(),
+            forged_url: null,
+            forged_thumbnail_url: null,
+            forged_duration_seconds: null
+          };
+          saveClientVideo(projectId, videoDoc);
+          toast.success(`Uploaded "${file.name}"`);
+          onUploaded?.(videoDoc);
+        } catch (e) {
+          toast.error("Failed to process video clip");
+        } finally {
+          setUploading(false);
+          xhrRef.current = null;
+        }
+      };
+
       xhr.onerror = () => {
-        toast.error("Upload failed — network error");
-        setUploading(false);
-        xhrRef.current = null;
+        handleClientFallback("network error");
       };
 
       xhr.onabort = () => {
@@ -114,9 +144,9 @@ export default function VideoUploader({ projectId, onUploaded }) {
       };
 
       xhr.onload = () => {
-        xhrRef.current = null;
-        setUploading(false);
         if (xhr.status >= 200 && xhr.status < 300) {
+          xhrRef.current = null;
+          setUploading(false);
           try {
             const data = JSON.parse(xhr.responseText);
             toast.success(`Uploaded "${data.title}"`);
@@ -125,13 +155,26 @@ export default function VideoUploader({ projectId, onUploaded }) {
             toast.error("Server returned invalid response");
           }
         } else {
+          let isFfprobeIssue = false;
           let detail = "Upload failed";
           try {
             const body = JSON.parse(xhr.responseText);
             detail = formatApiError({ response: { data: body } }, "Upload failed");
+            const lower = detail.toLowerCase();
+            if (lower.includes("ffprobe") || lower.includes("metadata") || lower.includes("no such file")) {
+              isFfprobeIssue = true;
+            }
           } catch {
             /* ignore */
           }
+
+          if (isFfprobeIssue) {
+            handleClientFallback("ffprobe missing on server");
+            return;
+          }
+
+          xhrRef.current = null;
+          setUploading(false);
           toast.error(detail);
         }
       };

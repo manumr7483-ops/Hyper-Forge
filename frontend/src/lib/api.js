@@ -44,6 +44,11 @@ export function apiFileUrl(path) {
   ) {
     return path;
   }
+  if (path.startsWith("/samples/") || path.startsWith("samples/")) {
+    const pub = (process.env.PUBLIC_URL || "").replace(/\/+$/, "");
+    const clean = path.startsWith("/") ? path : `/${path}`;
+    return `${pub}${clean}`;
+  }
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${BACKEND_URL}${cleanPath}`;
 }
