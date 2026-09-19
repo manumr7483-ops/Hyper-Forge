@@ -1,0 +1,9 @@
+{
+  "short_name": "HyperForge",
+  "name": "HYPERFORGE \u2014 Forge scroll-stopping content",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#050507",
+  "background_color": "#050507"
+}
