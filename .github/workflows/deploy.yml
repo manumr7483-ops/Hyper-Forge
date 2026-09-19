@@ -38,7 +38,7 @@ jobs:
         env:
           CI: "false"
           REACT_APP_BACKEND_URL: https://forge-preview-43.preview.emergentagent.com
-          PUBLIC_URL: /HypeFoge
+          PUBLIC_URL: /Hyper-Forge
         run: |
           set +e
           npm run build > build_output.log 2>&1
@@ -51,6 +51,8 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
